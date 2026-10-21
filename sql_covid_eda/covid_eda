@@ -1,3 +1,6 @@
+-- 1. ПОДГОТОВКА ДАННЫХ
+-- Изменение типа столбца «date» с VARCHAR на DATE для проведения корректного анализа.
+
 ALTER TABLE "CovidDeaths"
 ALTER COLUMN date TYPE DATE
 USING TO_DATE(date, 'DD.MM.YYYY');
@@ -14,14 +17,18 @@ SELECT *
 FROM "CovidVaccination" cv
 ORDER BY location, date; 
 
--- выберем данные, которые будем использовать
+
+
+-- 2. БАЗОВЫЙ АНАЛИЗ
+-- Выбор основных столбцов, которые будем использовать для анализа.
 
 SELECT location, date, total_cases, new_cases, total_deaths, population
 FROM "CovidDeaths"
 ORDER BY location, date;
 
--- сравним общее число заражений и число смертей от ковида
--- вероятность смерти при заражении ковидом в России
+-- Расчёт доли смертельных исходов в России:
+-- (Общее число смертей / Общее число случаев) * 100.
+-- Приводим к типу NUMERIC, чтобы избежать проблем с целочисленным делением.
 
 SELECT location, date, total_cases, total_deaths, 
        (total_deaths::NUMERIC / total_cases)*100 as death_percentage 
@@ -29,8 +36,8 @@ FROM "CovidDeaths"
 WHERE location = 'Russia'
 ORDER BY location, date;
 
--- общее количество случаев заражения по отношению к населению
--- какой процент населения заболел ковидом
+-- Расчет доли населения, заразившегося в России:
+-- (Общее число случаев / Численность населения) * 100.
 
 SELECT location, date, population, total_cases, 
        (total_cases::NUMERIC / population)*100 as percent_population_infected
@@ -39,9 +46,10 @@ WHERE location = 'Russia'
 ORDER BY location, date;
 
 
--- РАЗОБЬЁМ ПО КОНТИНЕНТАМ
 
--- континенты с самым высоким числом смертей
+-- 3. АНАЛИЗ ПО КОНТИНЕНТАМ
+-- Поиск континентов с наибольшим числом смертей.
+-- Убираем агрегированные данные вроде 'World', у которых континент равен NULL.
 
 SELECT continent, MAX(total_deaths) as total_death_count
 FROM "CovidDeaths"
@@ -51,9 +59,12 @@ HAVING MAX(total_deaths) IS NOT NULL
 ORDER BY total_death_count DESC;
 
 
--- ЗАПРОСЫ ДЛЯ TABLEAU
 
--- 1. ГЛОБАЛЬНЫЕ ПОКАЗАТЕЛИ
+-- 4. ЗАПРОСЫ ДЛЯ ДАШБОРДА TABLEAU
+
+-- 4.1. ОБЩИЕ ПОКАЗАТЕЛИ ПО МИРУ
+-- Расчет общего числа случаев заболевания, числа смертей, процента смертности.
+-- Исключаем локации не являющиеся странами (континенты, «World», «Oceania» и т.д.).
 
 SELECT SUM(new_cases) as total_cases, 
        SUM(new_deaths) as total_deaths, 
@@ -76,8 +87,8 @@ ORDER BY total_cases, total_deaths;
 
 
 
--- 2. Страны с самым высоким числом смертей на душу населения
--- в предыдущие запросы не входят некоторые локации, поэтому мы исключим их для сохранения единообразия. Европейский союз - часть Европы
+-- 4.2. СТРАНЫ С САМЫМ ВЫСОКИМ ЧИСЛОМ СМЕРТЕЙ НА ДУШУ НАСЕЛЕНИЯ
+-- в предыдущие запросы не входят некоторые локации, поэтому мы исключим их для сохранения единообразия.
 
 SELECT location, SUM(new_deaths::NUMERIC) as total_death_count
 FROM "CovidDeaths"
@@ -87,7 +98,9 @@ GROUP BY location
 ORDER BY total_death_count DESC;
 
 
--- 3. Посмотрим на страны с самым высоким уровнем заражения по отношению к населению
+
+-- 4.3. СТРАНЫ С САМЫМ ВЫСОКИМ УРОВНЕМ ЗАРАЖЕНИЯ
+-- Используем подзапрос для поиска максимального числа заражений и соответствующего процентного показателя.
 
 SELECT * FROM (
     SELECT location, population, 
@@ -98,7 +111,10 @@ SELECT * FROM (
 ) t
 ORDER BY percent_population_infected DESC;
 
--- 4. 
+
+
+-- 4.4. СТРАНЫ С САМЫМ ВЫСОКИМ УРОВНЕМ ЗАРАЖЕНИЯ (TIME-SERIES)
+-- То же самое, но с сохранением столбца «date» для построения графиков временных рядов в Tableau.
 
 SELECT * FROM (
     SELECT location, population, date,
@@ -109,7 +125,11 @@ SELECT * FROM (
 ) t
 ORDER BY percent_population_infected DESC;
 
--- сравним общую численность населения с вакцинацией
+
+
+-- 5. ПРОГРЕСС ВАКЦИНАЦИИ
+-- Объединяем таблицы для сравнения численности населения с показателями вакцинации.
+-- Используем оконную функцию для расчета скользящего общего кол-ва вакцинированных.
 
 SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
 , SUM(vac.new_vaccinations::NUMERIC) OVER (Partition by dea.location ORDER BY dea.date) as rolling_people_vaccinated
@@ -121,7 +141,9 @@ JOIN "CovidVaccination" vac
 WHERE dea.continent IS NOT NULL
 ORDER BY dea.location, dea.date;
 
--- воспользуемся CTE 
+
+-- Используем CTE для расчета процента вакцинированного населения,
+-- потому что не можем ссылаться на псевдоним rolling_people_vaccinated в том же операторе SELECT.
 
 WITH pop_vs_vac AS (
 SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
@@ -139,7 +161,8 @@ FROM pop_vs_vac;
 
 
 
--- ВРЕМЕННАЯ ТАБЛИЦА
+-- 6. ВИТРИНА ДАННЫХ
+-- Создаем витрину данных с готовыми расчетами для визуализации в Tableau.
 
 DROP TABLE IF EXISTS "PercentPopulationVaccinated";
 
@@ -167,7 +190,7 @@ SELECT *, (rolling_people_vaccinated / population) * 100 as percent_population_v
 FROM "PercentPopulationVaccinated";
 
 
--- создадим представление (view) для хранения данных для построения визуализаций
+-- Создадим представление для прямого подключения к Tableau.
 
 CREATE VIEW "PopulationVaccinationRate" AS
 SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
