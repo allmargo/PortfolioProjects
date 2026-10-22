@@ -6,7 +6,6 @@ FROM nashville_housing
 
 
 
-
 -- стандартизируем формат даты
 
 ALTER TABLE nashville_housing
@@ -16,9 +15,7 @@ USING TO_DATE("SaleDate", 'Month DD, YYYY');
 
 
 
-
-
--- сопоставление адресов по ID адреса
+-- сопоставление адресов по "ParcelID"
 
 SELECT a."ParcelID", a."PropertyAddress", b."ParcelID", b."PropertyAddress", COALESCE(a."PropertyAddress", b."PropertyAddress")
 FROM nashville_housing a
@@ -39,19 +36,15 @@ WHERE a."ParcelID" = b."ParcelID"
 
 
 
-
-
 -- разделяем адрес на отдельные колонки: Address, City, State
 
 SELECT "PropertyAddress"
 FROM nashville_housing
-
+	
 SELECT 
        SUBSTRING("PropertyAddress" FROM 1 FOR POSITION(',' IN "PropertyAddress") - 1) as "Address",
        SUBSTRING("PropertyAddress" FROM POSITION(',' IN "PropertyAddress") + 1) as "City"
 FROM nashville_housing
-
-
 
 
 ALTER TABLE nashville_housing 
@@ -69,12 +62,9 @@ SET "PropertySplitCity" = SUBSTRING("PropertyAddress" FROM POSITION(',' IN "Prop
 
 
 
-SELECT *
-FROM nashville_housing
 
-
-
-
+-- делим колонку "OwnerSplitAddress" на три составляющие
+	
 SELECT SPLIT_PART("OwnerAddress", ',', -3),
        SPLIT_PART("OwnerAddress", ',', -2),
        SPLIT_PART("OwnerAddress", ',', -1)
@@ -87,11 +77,13 @@ ADD "OwnerSplitAddress" VARCHAR(50);
 UPDATE nashville_housing 
 SET "OwnerSplitAddress" = SPLIT_PART("OwnerAddress", ',', -3);
 
+
 ALTER TABLE nashville_housing 
 ADD "OwnerSplitCity" VARCHAR(50);
 
 UPDATE nashville_housing 
 SET "OwnerSplitCity" = SPLIT_PART("OwnerAddress", ',', -2);
+
 
 ALTER TABLE nashville_housing 
 ADD "OwnerSplitState" VARCHAR(50);
@@ -102,14 +94,12 @@ SET "OwnerSplitState" = SPLIT_PART("OwnerAddress", ',', -1);
 
 
 
-
--- заменим Y и N на Yes и No в поле "Sold as Vacant"
+-- заменим Y и N на Yes и No в поле "SoldAsVacant"
 
 SELECT DISTINCT("SoldAsVacant"), COUNT("SoldAsVacant") as count
 FROM nashville_housing 
 GROUP BY "SoldAsVacant"
 ORDER BY count
-
 
 
 SELECT "SoldAsVacant"
@@ -131,9 +121,7 @@ END
 
 
 
-
 -- удалим дубликаты
-
 
 WITH row_num_cte AS (
 SELECT *,
@@ -164,9 +152,7 @@ WHERE "UniqueID " IN (
 
 
 
-
 -- удалим неиспользуемые колонки
-
 
 ALTER TABLE nashville_housing
 DROP COLUMN "OwnerAddress",
