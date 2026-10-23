@@ -14,3 +14,4 @@
 *   CTE
 *   условная логика (`CASE WHEN`)
 *   обработка пропусков (`IS NULL`, `COALESCE`)
+*   Feature Engineering
