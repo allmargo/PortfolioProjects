@@ -3,8 +3,9 @@
 Цель: выявить факторы (бюджет, оценка, студия) имеющие наибольшую корреляцию с кассовыми сборами (gross).
 
 ## Стек технологий
-*   Python 3
+*   Python
 *   Pandas, NumPy, Matplotlib, Seaborn
+*   Jupyter Notebook / Google Colab
 
 ## Ключевые навыки
 *   **Data Cleaning, Feature Engineering:**
