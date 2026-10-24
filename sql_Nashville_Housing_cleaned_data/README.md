@@ -3,8 +3,8 @@
 **Цель:** Преобразовать исходный датасет для проведения EDA.
 
 ## Стек технологий
-*   **PostgreSQL**
-*   **DBeaver**
+*   PostgreSQL
+*   DBeaver
 
 ## Ключевые навыки
 *   DDL (`ALTER TABLE`, `ADD COLUMN`, `DROP COLUMN`)
